@@ -3,7 +3,7 @@
 import re
 import uuid
 from typing import List, Tuple, Dict
-from .storage import TextChunk
+from storage import TextChunk
 
 
 class TextProcessor:
@@ -18,31 +18,55 @@ class TextProcessor:
     def parse_transcript(self, content: str) -> List[Dict]:
         """
         Parse transcript content into structured segments.
+        Handles multi-line speaker segments including bullet points and formatted lists.
+        Filters out system/action lines like *screen share* or *Call ends*.
         
         Returns:
             List of dicts with 'timestamp', 'speaker', 'content'
         """
         segments = []
         lines = content.strip().split('\n')
+        current_segment = None
+        
+        # Pattern to match system/action lines like [HH:MM] *action*
+        action_pattern = r'\[\d{2}:\d{2}\]\s*\*.*\*\s*$'
         
         for line in lines:
             line = line.strip()
             if not line:
                 continue
+            
+            # Skip system/action lines like [05:12] *screen share: ROI.xlsx*
+            if re.match(action_pattern, line):
+                continue
                 
             # Try to match speaker pattern [HH:MM] Speaker: Content
             match = re.match(self.speaker_pattern, line)
             if match:
+                # If we have a previous segment, save it
+                if current_segment:
+                    segments.append(current_segment)
+                
                 timestamp, speaker, text = match.groups()
                 
                 # Clean up speaker name (remove parenthetical info)
                 speaker_clean = re.sub(r'\s*\([^)]*\)', '', speaker).strip()
                 
-                segments.append({
+                # Start new segment
+                current_segment = {
                     'timestamp': timestamp,
                     'speaker': speaker_clean,
                     'content': text.strip()
-                })
+                }
+            else:
+                # This is a continuation line (bullet point, numbered list, etc.)
+                if current_segment:
+                    # Add the line to the current segment's content
+                    current_segment['content'] += '\n' + line
+        
+        # Don't forget the last segment
+        if current_segment:
+            segments.append(current_segment)
         
         return segments
     
