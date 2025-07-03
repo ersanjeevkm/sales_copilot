@@ -1,0 +1,144 @@
+"""Text processing and chunking utilities."""
+
+import re
+import uuid
+from typing import List, Tuple, Dict
+from .storage import TextChunk
+
+
+class TextProcessor:
+    """Handles text processing, parsing, and chunking of call transcripts."""
+    
+    def __init__(self, chunk_size: int = 256):
+        self.chunk_size = chunk_size
+        # Regex patterns for parsing call transcripts
+        self.timestamp_pattern = r'\[(\d{2}:\d{2})\]'
+        self.speaker_pattern = r'\[(\d{2}:\d{2})\]\s*([^:]+):\s*(.+)'
+    
+    def parse_transcript(self, content: str) -> List[Dict]:
+        """
+        Parse transcript content into structured segments.
+        
+        Returns:
+            List of dicts with 'timestamp', 'speaker', 'content'
+        """
+        segments = []
+        lines = content.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Try to match speaker pattern [HH:MM] Speaker: Content
+            match = re.match(self.speaker_pattern, line)
+            if match:
+                timestamp, speaker, text = match.groups()
+                
+                # Clean up speaker name (remove parenthetical info)
+                speaker_clean = re.sub(r'\s*\([^)]*\)', '', speaker).strip()
+                
+                segments.append({
+                    'timestamp': timestamp,
+                    'speaker': speaker_clean,
+                    'content': text.strip()
+                })
+        
+        return segments
+    
+    def extract_participants(self, content: str) -> List[str]:
+        """Extract unique participant names from transcript."""
+        segments = self.parse_transcript(content)
+        participants = set()
+        
+        for segment in segments:
+            speaker = segment['speaker']
+            # Handle cases like "AE (Jordan)" -> "Jordan (AE)"
+            if '(' in speaker:
+                parts = speaker.split('(')
+                if len(parts) >= 2:
+                    role = parts[0].strip()
+                    name = parts[1].replace(')', '').strip()
+                    participants.add(f"{name} ({role})")
+            else:
+                participants.add(speaker)
+        
+        return sorted(list(participants))
+    
+    def _create_chunk(self, current_chunk: List[Dict], call_id: str, chunk_index: int) -> TextChunk:
+        """Create a TextChunk from a list of chunk segments."""
+        chunk_content = '\n'.join([seg['text'] for seg in current_chunk])
+        return TextChunk(
+            chunk_id=str(uuid.uuid4()),
+            call_id=call_id,
+            content=chunk_content,
+            speaker=self._get_primary_speaker(current_chunk),
+            timestamp=self._get_chunk_timestamp(current_chunk),
+            chunk_index=chunk_index
+        )
+
+    def create_chunks(self, call_id: str, content: str) -> List[TextChunk]:
+        """
+        Split transcript into chunks suitable for embedding.
+        
+        Strategy:
+        1. Parse into speaker segments
+        2. Group segments by chunk_size tokens (approximately)
+        3. Preserve speaker context and timestamps
+        """
+        segments = self.parse_transcript(content)
+        chunks = []
+        current_chunk = []
+        current_tokens = 0
+        chunk_index = 0
+        
+        for segment in segments:
+            segment_text = f"[{segment['timestamp']}] {segment['speaker']}: {segment['content']}"
+            # Rough token estimation (1 token ≈ 4 characters)
+            segment_tokens = len(segment_text) // 4
+            
+            # Create segment dict with parsed info
+            segment_info = {
+                'text': segment_text,
+                'timestamp': segment['timestamp'],
+                'speaker': segment['speaker'],
+                'tokens': segment_tokens
+            }
+            
+            # If adding this segment would exceed chunk size, finalize current chunk
+            if current_tokens + segment_tokens > self.chunk_size and current_chunk:
+                chunk = self._create_chunk(current_chunk, call_id, chunk_index)
+                chunks.append(chunk)
+                
+                # Start new chunk
+                current_chunk = []
+                current_tokens = 0
+                chunk_index += 1
+            
+            current_chunk.append(segment_info)
+            current_tokens += segment_tokens
+        
+        # Handle remaining chunk
+        if current_chunk:
+            chunk = self._create_chunk(current_chunk, call_id, chunk_index)
+            chunks.append(chunk)
+        
+        return chunks
+    
+    def _get_primary_speaker(self, chunk_segments: List[Dict]) -> str:
+        """Determine the primary speaker in a chunk."""
+        speaker_counts = {}
+        
+        for segment in chunk_segments:
+            speaker = segment['speaker']
+            speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
+        
+        if speaker_counts:
+            return max(speaker_counts, key=speaker_counts.get)
+        return "Unknown"
+    
+    def _get_chunk_timestamp(self, chunk_segments: List[Dict]) -> str:
+        """Get the starting timestamp of a chunk."""
+        if chunk_segments:
+            return chunk_segments[0]['timestamp']
+        return "00:00"
