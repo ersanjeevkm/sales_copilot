@@ -29,7 +29,7 @@ class TextChunk:
     chunk_id: str
     call_id: str
     content: str
-    speaker: str
+    speakers: List[str] 
     timestamp: str
     chunk_index: int
     embedding: Optional[List[float]] = None
@@ -73,7 +73,7 @@ class DatabaseManager:
                     chunk_id TEXT PRIMARY KEY,
                     call_id TEXT NOT NULL,
                     content TEXT NOT NULL,
-                    speaker TEXT,
+                    speakers TEXT,  -- JSON array of speakers
                     timestamp TEXT,
                     chunk_index INTEGER NOT NULL,
                     FOREIGN KEY (call_id) REFERENCES calls (call_id)
@@ -128,13 +128,13 @@ class DatabaseManager:
         try:
             cursor.execute('''
                 INSERT OR REPLACE INTO chunks 
-                (chunk_id, call_id, content, speaker, timestamp, chunk_index)
+                (chunk_id, call_id, content, speakers, timestamp, chunk_index)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 chunk.chunk_id,
                 chunk.call_id,
                 chunk.content,
-                chunk.speaker,
+                json.dumps(chunk.speakers),
                 chunk.timestamp,
                 chunk.chunk_index
             ))
@@ -177,7 +177,7 @@ class DatabaseManager:
                         chunk_id=row[0],
                         call_id=row[1],
                         content=row[2],
-                        speaker=row[3],
+                        speakers=json.loads(row[3]) if row[3] else [],
                         timestamp=row[4],
                         chunk_index=row[5]
                     )
