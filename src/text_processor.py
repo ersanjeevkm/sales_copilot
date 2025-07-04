@@ -96,7 +96,7 @@ class TextProcessor:
             chunk_id=str(uuid.uuid4()),
             call_id=call_id,
             content=chunk_content,
-            speaker=self._get_primary_speaker(current_chunk),
+            speakers=self._get_all_speakers(current_chunk),
             timestamp=self._get_chunk_timestamp(current_chunk),
             chunk_index=chunk_index
         )
@@ -157,8 +157,8 @@ class TextProcessor:
         
         return chunks, sorted(list(participants))
     
-    def _get_primary_speaker(self, chunk_segments: List[Dict]) -> str:
-        """Determine the primary speaker in a chunk."""
+    def _get_all_speakers(self, chunk_segments: List[Dict]) -> List[str]:
+        """Get all unique speakers in a chunk, ordered by frequency of speech."""
         speaker_counts = {}
         
         for segment in chunk_segments:
@@ -166,9 +166,10 @@ class TextProcessor:
             speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
         
         if speaker_counts:
-            return max(speaker_counts, key=speaker_counts.get)
-        return "Unknown"
-    
+            # Return speakers sorted by frequency (most frequent first)
+            return sorted(speaker_counts.keys(), key=lambda x: speaker_counts[x], reverse=True)
+        return ["Unknown"]
+        
     def _get_chunk_timestamp(self, chunk_segments: List[Dict]) -> str:
         """Get the starting timestamp of a chunk."""
         if chunk_segments:

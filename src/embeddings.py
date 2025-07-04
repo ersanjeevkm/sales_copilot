@@ -95,7 +95,7 @@ class EmbeddingManager:
         Search for similar chunks using semantic similarity.
         
         Returns:
-            List of dictonaries with chunk IDs and similarity scores.
+            List of dictionaries with 'chunk_id' and 'similarity_score' keys
         """
         if self.index.ntotal == 0:
             return []
