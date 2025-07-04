@@ -118,11 +118,16 @@ class SalesAnalysisAgent:
             call_identifier = self._extract_file_name(user_query)
         
         if not call_identifier:
-            return {
-                'answer': "Please specify which call you'd like me to summarize. You can reference by filename (e.g., '1_demo_call.txt') or call ID.",
-                'sources': [],
-                'confidence': 0.0
-            }
+            # If no specific filename found, try to get filenames from database based on query
+            filenames = self.tool_engine.get_filenames_from_query(user_query)
+            if filenames and filenames != "NO_FILES_FOUND":
+                return self.tool_engine.summarize_multiple_calls(filenames, user_query)
+            else:
+                return {
+                    'answer': "Please specify which call you'd like me to summarize. You can reference by filename (e.g., '1_demo_call.txt') or call ID, or use terms like 'last call', 'recent calls', etc.",
+                    'sources': [],
+                    'confidence': 0.0
+                }
         
         return self.tool_engine.summarize_call(call_identifier)
     
@@ -168,4 +173,3 @@ class SalesAnalysisAgent:
             return os.path.basename(txt_match.group())
         
         return None
-    

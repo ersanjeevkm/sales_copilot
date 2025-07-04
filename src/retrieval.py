@@ -181,27 +181,8 @@ class SalesAnalysisToolEngine:
                 temperature=0.1
             ).strip()
             
-            # Security check: ensure only SELECT queries
-            if not generated_sql.upper().strip().startswith('SELECT'):
-                return {
-                    'answer': "Error: Only SELECT queries are allowed for security reasons.",
-                    'sources': [],
-                    'query_executed': None
-                }
-            
-            # Additional security checks for dangerous keywords
-            dangerous_keywords = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'ALTER', 'CREATE', 'TRUNCATE']
-            sql_upper = generated_sql.upper()
-            for keyword in dangerous_keywords:
-                if keyword in sql_upper:
-                    return {
-                        'answer': f"Error: Query contains potentially dangerous keyword '{keyword}'. Only SELECT queries are allowed.",
-                        'sources': [],
-                        'query_executed': None
-                    }
-            
-            # Execute the query
-            results = self.db_manager.execute_query(generated_sql)
+            # Execute the query using the internal helper
+            results = self._execute_sql_safely(generated_sql)
             
             if not results:
                 return {
@@ -219,12 +200,37 @@ class SalesAnalysisToolEngine:
                 'query_executed': generated_sql
             }
             
+        except ValueError as e:
+            # Security-related errors
+            return {
+                'answer': f"Error: {str(e)}",
+                'sources': [],
+                'query_executed': generated_sql if 'generated_sql' in locals() else None
+            }
         except Exception as e:
             return {
                 'answer': f"Error executing database query: {str(e)}",
                 'sources': [],
                 'query_executed': generated_sql if 'generated_sql' in locals() else None
             }
+    
+    def _execute_sql_safely(self, sql_query: str) -> List[Tuple]:
+        """
+        Execute a raw SQL query with security checks (internal method).
+        Only accepts SELECT queries for security reasons.
+        
+        Args:
+            sql_query: Raw SQL query to execute
+            
+        Returns:
+            List of tuples with query results, or raises Exception on error
+        """
+        # Security check: ensure only SELECT queries
+        if not sql_query.upper().strip().startswith('SELECT'):
+            raise ValueError("Only SELECT queries are allowed for security reasons.")
+        
+        # Execute the query
+        return self.db_manager.execute_query(sql_query)
         
     def ingest_file_tool(self, filename: str) -> Dict:
         """
@@ -245,7 +251,7 @@ class SalesAnalysisToolEngine:
             import os
             if not os.path.exists(file_path):
                 return {
-                    'answer': f"Error: File '{filename}' not found in data directory ({Config.DATA_DIR}).",
+                    'answer': f"Error: File '{filename}' not found in data directory ({Config.get_data_directory()}).",
                     'sources': [],
                     'ingestion_result': None
                 }
@@ -281,6 +287,127 @@ class SalesAnalysisToolEngine:
                 'ingestion_result': None
             }
     
+    def get_filenames_from_query(self, user_query: str) -> str:
+        """
+        Generate SQL query to get filenames based on user query, then extract filenames.
+        Args:
+            user_query: User query like "summarize the last call" or "summarize recent calls"
+        Returns:
+            Comma-separated filenames or "NO_FILES_FOUND"
+        """
+        try:
+            # Generate SQL query to get filenames
+            filename_sql_prompt = PromptTemplates.get_filename_sql_prompt(user_query)
+            sql_query = self._generate_response(
+                system_prompt="",
+                user_prompt=filename_sql_prompt,
+                temperature=0.1
+            ).strip()
+            
+            # Execute the SQL query to get filenames
+            sql_results = self._execute_sql_safely(sql_query)
+            
+            if not sql_results:
+                return "NO_FILES_FOUND"
+            
+            # Extract filenames directly from SQL results
+            # sql_results is a list of tuples, each containing (filename,)
+            filenames = []
+            for row in sql_results:
+                if row and len(row) > 0 and row[0]:
+                    filename = str(row[0]).strip()
+                    if filename and filename.endswith('.txt'):
+                        filenames.append(filename)
+            
+            # Remove duplicates while preserving order
+            unique_filenames = []
+            for filename in filenames:
+                if filename not in unique_filenames:
+                    unique_filenames.append(filename)
+            
+            if not unique_filenames:
+                return "NO_FILES_FOUND"
+            
+            return ",".join(unique_filenames)
+            
+        except Exception as e:
+            print(f"Error in getting filenames from query: {e}")
+            return "NO_FILES_FOUND"
+    
+    def summarize_multiple_calls(self, filenames_str: str, original_query: str) -> Dict:
+        """
+        Summarize multiple calls and compile the results.
+        Args:
+            filenames_str: Comma-separated filenames
+            original_query: Original user query for context
+        Returns:
+            Dict with compiled summary results
+        """
+        try:
+            # Split and clean filenames, removing empty strings
+            filenames = [f.strip() for f in filenames_str.split(',') if f.strip()]
+            if not filenames:
+                return {
+                    'answer': "No valid filenames found to summarize.",
+                    'sources': [],
+                    'confidence': 0.0
+                }
+            # Summarize each call
+            summaries = []
+            all_sources = []
+            total_confidence = 0.0
+            confidence_count = 0  # Track valid confidence values
+            
+            for filename in filenames:
+                try:
+                    result = self.summarize_call(filename)
+                    if result and 'answer' in result:
+                        # Handle None confidence values
+                        confidence = result.get('confidence')
+                        if confidence is not None:
+                            total_confidence += confidence
+                            confidence_count += 1
+                        
+                        summaries.append({
+                            'filename': filename,
+                            'summary': result['answer'],
+                            'sources': result.get('sources', []),
+                            'confidence': confidence
+                        })
+                        all_sources.extend(result.get('sources', []))
+                except Exception as e:
+                    summaries.append({
+                        'filename': filename,
+                        'summary': f"Error summarizing {filename}: {str(e)}",
+                        'sources': [],
+                        'confidence': None
+                    })
+            # Compile the final response
+            if len(summaries) == 1:
+                # Single call summary
+                summary = summaries[0]
+                compiled_answer = f"Summary of {summary['filename']}:\n\n{summary['summary']}"
+            else:
+                # Multiple calls summary
+                compiled_answer = f"Summary of {len(summaries)} call(s):\n\n"
+                for i, summary in enumerate(summaries, 1):
+                    compiled_answer += f"{i}. {summary['filename']}:\n{summary['summary']}\n\n"
+            
+            avg_confidence = total_confidence / confidence_count if confidence_count > 0 else 0.0
+            
+            return {
+                'answer': compiled_answer.strip(),
+                'sources': list(set(all_sources)),  # Remove duplicates
+                'confidence': avg_confidence,
+                'files_summarized': len(summaries)
+            }
+        except Exception as e:
+            return {
+                'answer': f"Error compiling summaries: {str(e)}",
+                'sources': [],
+                'confidence': 0.0
+            }
+    
     def _build_context(self, relevant_chunks: List[Dict]) -> str:
         """Build context string from relevant chunks, grouped by call_id and sorted by chunk_index."""
         if not relevant_chunks:
@@ -309,8 +436,11 @@ class SalesAnalysisToolEngine:
                 chunk = item['chunk']
                 score = item['similarity_score']
                 
+                # Format speakers list for display
+                speakers_str = ", ".join(chunk.speakers) if chunk.speakers else "Unknown"
+                
                 call_parts.append(
-                    f"[{chunk.timestamp}] {chunk.speaker} [Relevance: {score:.2f}]:\n{chunk.content}\n"
+                    f"[{chunk.timestamp}] {speakers_str} [Relevance: {score:.2f}]:\n{chunk.content}\n"
                 )
             
             call_contexts.append('\n'.join(call_parts))

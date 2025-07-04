@@ -57,11 +57,16 @@ def format_response(response: dict) -> str:
     tool_used = response.get('tool_used', 'Unknown')
     result = response.get('result', {})
     
-    output = f"\nTool Used: {tool_used}\n"
-    output += "-" * 50 + "\n"
+    output = f"\n{'='*60}\n"
+    output += f"Tool Used: {tool_used}\n"
+    output += f"{'='*60}\n"
     
     if 'answer' in result:
-        output += f"Answer:\n{result['answer']}\n"
+        output += f"\n{result['answer']}\n"
+    
+    # Handle multiple files summarized
+    if 'files_summarized' in result and result['files_summarized'] > 1:
+        output += f"\nFiles Processed: {result['files_summarized']}\n"
     
     if 'sources' in result and result['sources']:
         output += f"\nSources:\n"
@@ -80,6 +85,8 @@ def format_response(response: dict) -> str:
     
     if 'data' in result and result['data']:
         output += f"\nResults:\n{result['data']}\n"
+    
+    output += f"\n{'-'*60}\n"
     
     return output
 
