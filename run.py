@@ -73,7 +73,9 @@ def format_response(response: dict) -> str:
         if confidence is not None and confidence > 0:
             output += f"\nConfidence: {confidence:.2f}\n"
     
-    if 'sql_query' in result:
+    if 'query_executed' in result and result['query_executed']:
+        output += f"\nSQL Query: {result['query_executed']}\n"
+    elif 'sql_query' in result:
         output += f"\nSQL Query: {result['sql_query']}\n"
     
     if 'data' in result and result['data']:

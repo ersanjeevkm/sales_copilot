@@ -123,9 +123,11 @@ Important Rules:
 4. Use LIMIT if the result set might be very large
 5. For participants field, remember it's stored as JSON - use json_extract() if needed
 6. Include column aliases for better readability
-7. Return only the SQL query, no explanations
+7. Return ONLY the raw SQL query with no formatting, explanations, or code blocks
+8. Do NOT wrap the query in ```sql``` or any other markdown formatting
+9. Do NOT include any text before or after the SQL query
 
-SQL Query:
+Generate the SQL query:
 """
 
     @classmethod

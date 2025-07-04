@@ -99,7 +99,7 @@ class BatchIngestor:
             if 'results' in result:
                 for file_result in result.get('results', []):
                     if not file_result.get('success'):
-                        print(f"âœ— {file_result.get('filename', 'Unknown')}: {file_result.get('error', 'Unknown error')}")
+                        print(f"{file_result.get('filename', 'Unknown')}: {file_result.get('error', 'Unknown error')}")
         
         return result
         
