@@ -3,7 +3,7 @@
 import re
 import uuid
 from typing import List, Tuple, Dict
-from storage import TextChunk
+from .storage import TextChunk
 
 
 class TextProcessor:
@@ -101,22 +101,30 @@ class TextProcessor:
             chunk_index=chunk_index
         )
 
-    def create_chunks(self, call_id: str, content: str) -> List[TextChunk]:
+    def create_chunks(self, call_id: str, content: str) -> Tuple[List[TextChunk], List[str]]:
         """
-        Split transcript into chunks suitable for embedding.
+        Split transcript into chunks suitable for embedding and extract participants.
         
         Strategy:
         1. Parse into speaker segments
         2. Group segments by chunk_size tokens (approximately)
         3. Preserve speaker context and timestamps
+        4. Extract unique participants during processing
+        
+        Returns:
+            Tuple of (chunks, participants)
         """
         segments = self.parse_transcript(content)
         chunks = []
+        participants = set()
         current_chunk = []
         current_tokens = 0
         chunk_index = 0
         
         for segment in segments:
+            # Add speaker to participants set
+            participants.add(segment['speaker'])
+            
             segment_text = f"[{segment['timestamp']}] {segment['speaker']}: {segment['content']}"
             # Rough token estimation (1 token ≈ 4 characters)
             segment_tokens = len(segment_text) // 4
@@ -147,22 +155,5 @@ class TextProcessor:
             chunk = self._create_chunk(current_chunk, call_id, chunk_index)
             chunks.append(chunk)
         
-        return chunks
+        return chunks, sorted(list(participants))
     
-    def _get_primary_speaker(self, chunk_segments: List[Dict]) -> str:
-        """Determine the primary speaker in a chunk."""
-        speaker_counts = {}
-        
-        for segment in chunk_segments:
-            speaker = segment['speaker']
-            speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
-        
-        if speaker_counts:
-            return max(speaker_counts, key=speaker_counts.get)
-        return "Unknown"
-    
-    def _get_chunk_timestamp(self, chunk_segments: List[Dict]) -> str:
-        """Get the starting timestamp of a chunk."""
-        if chunk_segments:
-            return chunk_segments[0]['timestamp']
-        return "00:00"

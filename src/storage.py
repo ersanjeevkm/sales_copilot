@@ -14,7 +14,6 @@ class CallTranscript:
     """Represents a sales call transcript."""
     call_id: str
     filename: str
-    content: str
     participants: List[str]
     created_at: str
     metadata: Dict = None
@@ -62,7 +61,6 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS calls (
                     call_id TEXT PRIMARY KEY,
                     filename TEXT NOT NULL,
-                    content TEXT NOT NULL,
                     participants TEXT NOT NULL,  -- JSON array
                     created_at TEXT NOT NULL,
                     metadata TEXT  -- JSON object
@@ -111,12 +109,11 @@ class DatabaseManager:
         try:
             cursor.execute('''
                 INSERT OR REPLACE INTO calls 
-                (call_id, filename, content, participants, created_at, metadata)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (call_id, filename, participants, created_at, metadata)
+                VALUES (?, ?, ?, ?, ?)
             ''', (
                 call.call_id,
                 call.filename,
-                call.content,
                 json.dumps(call.participants),
                 call.created_at,
                 json.dumps(call.metadata)
@@ -145,3 +142,101 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error storing chunk: {e}")
             return False
+        
+    def get_call_count(self) -> int:
+        """Get total number of calls in database."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT COUNT(*) FROM calls')
+                return cursor.fetchone()[0]
+        except Exception as e:
+            print(f"Error getting call count: {e}")
+            return 0
+        
+        
+    def get_chunks_by_ids(self, chunk_ids: List[str]) -> List[TextChunk]:
+        """Retrieve chunks by list of IDs."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                if not chunk_ids:
+                    return []
+                
+                # Create placeholders for the IN clause
+                placeholders = ','.join(['?' for _ in chunk_ids])
+                query = f'SELECT * FROM chunks WHERE chunk_id IN ({placeholders})'
+                
+                cursor.execute(query, chunk_ids)
+                rows = cursor.fetchall()
+                
+                chunks = []
+                for row in rows:
+                    chunk = TextChunk(
+                        chunk_id=row[0],
+                        call_id=row[1],
+                        content=row[2],
+                        speaker=row[3],
+                        timestamp=row[4],
+                        chunk_index=row[5]
+                    )
+                    chunks.append(chunk)
+                
+                return chunks
+        except Exception as e:
+            print(f"Error retrieving chunks: {e}")
+            return []
+
+    def get_calls_by_ids(self, call_ids: List[str]) -> List[CallTranscript]:
+        """Retrieve multiple calls by list of IDs."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                if not call_ids:
+                    return []
+                
+                # Create placeholders for the IN clause
+                placeholders = ','.join(['?' for _ in call_ids])
+                query = f'SELECT * FROM calls WHERE call_id IN ({placeholders})'
+                
+                cursor.execute(query, call_ids)
+                rows = cursor.fetchall()
+                
+                calls = []
+                for row in rows:
+                    call = CallTranscript(
+                        call_id=row[0],
+                        filename=row[1],
+                        participants=json.loads(row[2]),
+                        created_at=row[3],
+                        metadata=json.loads(row[4]) if row[4] else {}
+                    )
+                    calls.append(call)
+                
+                return calls
+        except Exception as e:
+            print(f"Error retrieving calls: {e}")
+            return []
+
+    def get_call_by_id(self, call_id: str) -> Optional[CallTranscript]:
+        """Retrieve a specific call by ID."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM calls WHERE call_id = ?', (call_id,))
+                row = cursor.fetchone()
+                
+                if row:
+                    return CallTranscript(
+                        call_id=row[0],
+                        filename=row[1],
+                        participants=json.loads(row[2]),
+                        created_at=row[3],
+                        metadata=json.loads(row[4]) if row[4] else {}
+                    )
+                return None
+        except Exception as e:
+            print(f"Error retrieving call: {e}")
+            return None
