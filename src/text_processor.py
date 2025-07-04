@@ -157,3 +157,21 @@ class TextProcessor:
         
         return chunks, sorted(list(participants))
     
+    def _get_primary_speaker(self, chunk_segments: List[Dict]) -> str:
+        """Determine the primary speaker in a chunk."""
+        speaker_counts = {}
+        
+        for segment in chunk_segments:
+            speaker = segment['speaker']
+            speaker_counts[speaker] = speaker_counts.get(speaker, 0) + 1
+        
+        if speaker_counts:
+            return max(speaker_counts, key=speaker_counts.get)
+        return "Unknown"
+    
+    def _get_chunk_timestamp(self, chunk_segments: List[Dict]) -> str:
+        """Get the starting timestamp of a chunk."""
+        if chunk_segments:
+            return chunk_segments[0]['timestamp']
+        return "00:00"
+    
