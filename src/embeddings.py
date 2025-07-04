@@ -90,12 +90,12 @@ class EmbeddingManager:
             print(f"Error adding chunks to index: {e}")
             return False
     
-    def search(self, query: str, k: int = 5) -> List[Tuple[str, float]]:
+    def search(self, query: str, k: int = 5) -> List[dict]:
         """
         Search for similar chunks using semantic similarity.
         
         Returns:
-            List of (chunk_id, similarity_score) tuples
+            List of dictonaries with chunk IDs and similarity scores.
         """
         if self.index.ntotal == 0:
             return []
@@ -114,7 +114,10 @@ class EmbeddingManager:
             for score, idx in zip(scores[0], indices[0]):
                 if idx < len(self.chunk_ids):
                     chunk_id = self.chunk_ids[idx]
-                    results.append((chunk_id, float(score)))
+                    results.append({
+                        'chunk_id': chunk_id,
+                        'similarity_score': float(score)
+                    })
             
             return results
             
