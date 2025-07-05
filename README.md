@@ -122,8 +122,8 @@ chunks: chunk_id, call_id, content, speakers, timestamp, chunk_index
 - Inner product for cosine similarity
 - Simple, reliable, good for moderate scale
 - **Rationale**: Straightforward deployment, good retrieval quality
-- Other indexes like IVF and HNSW can be used when there are huge number of chunks to optimize query time
-
+- To optimize query latency for large-scale data, indexing methods like IVF and HNSW can be employed.
+  
 ### LLM Integration
 
 **GPT-4o-mini for Generation**
@@ -159,9 +159,8 @@ LLM_MODEL=gpt-4o-mini
 
 1. **Transcript Format**: Files follow `[HH:MM] Speaker: Content` format
 2. **Language**: English language calls (embedding model optimized for English)
-4. **Concurrent Users**: Single-user CLI application
-5. **Data Retention**: No automatic cleanup (manual management)
-6. **Small Dataset**: Files do have low to medium word length and they are less in number
+3. **Concurrent Users**: Single-user CLI application
+4. **Small Dataset**: The files are limited in number and typically contain a low to moderate word count.
 
 ## 📊 Architecture Diagrams
 
