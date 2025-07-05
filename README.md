@@ -122,7 +122,7 @@ chunks: chunk_id, call_id, content, speakers, timestamp, chunk_index
 - Inner product for cosine similarity
 - Simple, reliable, good for moderate scale
 - **Rationale**: Straightforward deployment, good retrieval quality
-- Other indexes like IV and HNSW can be used when there are huge number of chunks to optimize query time
+- Other indexes like IVF and HNSW can be used when there are huge number of chunks to optimize query time
 
 ### LLM Integration
 
