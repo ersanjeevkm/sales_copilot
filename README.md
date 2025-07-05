@@ -1,4 +1,4 @@
-# 🎯 Sales Copilot - AI-Powered Sales Call Intelligence
+# 🎯 Sales Copilot - AI-Powered Sales Call Intelligence*
 
 <sub>*\* This README has been enhanced using LLM for improved documentation and visual diagrams*</sub>
 
@@ -162,7 +162,8 @@ LLM_MODEL=gpt-4o-mini
 3. **Concurrent Users**: Single-user CLI application
 4. **Small Dataset**: The files are limited in number and typically contain a low to moderate word count.
 
-## 📊 Architecture Diagrams
+## 📊 Architecture Diagrams*
+<sub>*\*This is best viewed in light mode.*</sub>
 
 ### 🔄 System Architecture Flow
 
