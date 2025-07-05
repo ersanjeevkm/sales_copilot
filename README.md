@@ -1,5 +1,7 @@
 # 🎯 Sales Copilot - AI-Powered Sales Call Intelligence
 
+<sub>*\* This README has been enhanced using LLM for improved documentation and visual diagrams*</sub>
+
 An advanced conversational AI system that empowers sales teams to unlock insights from their call transcripts using cutting-edge retrieval-augmented generation (RAG), vector embeddings, and OpenAI's language models.
 
 ## 🚀 Quick Start
