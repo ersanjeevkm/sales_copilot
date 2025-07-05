@@ -328,3 +328,23 @@ erDiagram
 - **Speaker Context**: Each chunk preserves which speakers were active
 - **Timestamps**: Original transcript timestamps are preserved for temporal analysis
 
+### Demo
+
+**1. Ingestion tool**
+![ingestion](./images/example_1.png)
+
+**2. Setup**
+![setup](./images/setup.png)
+
+**3. SQL tool**
+![sql](./images/sql.png)
+
+**4. RAG tool**
+![rag](./images/rag.png)
+
+**5. Summary (prompted with filename)**
+![summary_1](./images/summary.png)
+
+**6. Summary (prompted with file filter)**
+![summary_2_1](./images/summary_db_1.png)
+![summary_2_2](./images/summary_db_2.png)
